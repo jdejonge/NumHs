@@ -4,6 +4,7 @@ Description : This module describes the core data types and functions of NumHS.
 -}
 module Core(
     Error(..),
+    Tensor(),
     vector,
     fromList,
     shape,
@@ -26,7 +27,7 @@ instance Show Interval where
 
 
 -- |Function to create a Interval. Fails if incorrect values are provided.
-(|:|) :: Int        -- ^Inclusive lower bound of Interval. Needs to be @0<= lower bound@
+(|:|) :: Int        -- ^Inclusive lower bound of Interval. Needs to be @0 <= lower bound@
         -> Int      -- ^Exclusive upper bound of Interval. Needs to be @lower bound< upper bound@
         -> Interval    -- ^Returns a Interval on succes, fails if the requirements are not satisfied.
 lower |:| upper | lower >= 0 && upper > lower = Interval lower upper
@@ -35,11 +36,11 @@ lower |:| upper | lower >= 0 && upper > lower = Interval lower upper
 inInterval :: Interval -> Int -> Bool
 inInterval (Interval lower upper) n = lower <= n && n < upper
 
-
+-- |Main Tensor datatype.
 data Tensor a = Dense [a] [Int] | Sparse
 
--- |Returns the shape of the Tensor.
-shape :: Tensor a -- ^The Tensor we want to know the shape of.
+-- |Returns the shape of the `Tensor`.
+shape :: Tensor a -- ^The `Tensor` we want to know the shape of.
         -> [Int] -- ^Returns the shape of the argument Tensor.
 shape (Dense _ s) = s
 shape Sparse = undefined
@@ -50,22 +51,22 @@ instance (Show a) => Show (Tensor a) where
     show Sparse = undefined
 
 -- |Reshaping Tensors.
-reshape :: Tensor a  -- ^Tensor to be reshaped.
+reshape :: Tensor a  -- ^`Tensor` to be reshaped.
         -> [Int] -- ^The new shape. Its product should equal the product of the old shape.
-        -> Either Error (Tensor a) -- ^Returns the Tensor with the new shape on succes.
+        -> Either Error (Tensor a) -- ^Returns the `Tensor` with the new shape on succes.
 reshape (Dense d shape) newshape    | product shape == product newshape = Right $ Dense d newshape
                                     | otherwise = Left $ Error $ "Cannot reshape Tensor of shape " ++ show shape ++ " to new shape " ++ show newshape ++ "."
 
 
 -- |Creates a vector from a given list.
 vector :: [a] -- ^The list containing the elements of the vector.
-        -> Tensor a -- ^Returns a 1D Tensor.
+        -> Tensor a -- ^Returns a 1D `Tensor`.
 vector xs = Dense xs $ [length xs]
 
--- |Creates a Tensor of the given shape from a list of elements.
+-- |Creates a `Tensor` of the given shape from a list of elements.
 fromList :: [a] -- ^A flat list containing the elements of the tensor.
         -> [Int] -- ^The shape of the tensor, such that @product shape = length list@
-        -> Either Error (Tensor a) -- ^Returns a Tensor of the given shape holding the data on success.
+        -> Either Error (Tensor a) -- ^Returns a `Tensor` of the given shape holding the data on success.
 fromList as shape   | product shape == length as = Right $ Dense as shape
                     | otherwise = Left $ Error $ "List with " ++ show (length as) ++ " elements cannot be casted to a square Tensor of shape " ++ show shape ++ "."
 
@@ -82,14 +83,14 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 
--- This assumes that there is no Tensor with shape [], which should be enforced by the functions used to create tensors.
+-- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
 (Dense xs s@(_:shape)) |@| index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
                             in case idx < length xs of 
                                 True -> Right $ xs !! idx
                                 False -> Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
 Sparse |@| _ = undefined
 
--- |Slicing allows for taking a contiguous subsection of a Tensor.
+-- |Slicing allows for taking a contiguous subsection of a `Tensor`.
 --
 -- __Examples__
 -- 
@@ -115,7 +116,7 @@ Sparse |@| _ = undefined
 
 (|#|) :: Tensor a -- ^The tensor to take the subtensor of.
         -> [Interval] -- ^List of intervals for each dimension to be included in the new tensor.
-        -> Either Error (Tensor a) -- ^Returns a new tensor of the same dimensionality on succes.
+        -> Either Error (Tensor a) -- ^Returns a new `Tensor` of the same dimensionality on succes.
 (Dense d shape) |#| intervals   | validInterval shape intervals = let 
                                         mods = shape
                                         divs = (tail shape) ++ [1]
