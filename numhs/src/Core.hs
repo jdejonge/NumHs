@@ -16,6 +16,7 @@ module Core(
 
 import qualified Data.List as L
 import qualified Data.List.Split as LS
+import GHC.Base (undefined)
 
 -- |Tensor error, returned by functions that might fail depending on the shape of its argument(s).
 data Error = Error String deriving(Show)
@@ -135,3 +136,19 @@ Sparse |#| _ = undefined
 validInterval :: [Int] -> [Interval] -> Bool
 validInterval shape interval  | length shape == length interval = all id [u <= x|(x, Interval _ u) <- zip shape interval]
                         | otherwise = False
+
+-- |Indexing Tensors. Retrieves a single element at the specified index.
+getIndex :: Tensor a 
+        -> [Int] -- ^List of indices, one integer for each dimension.
+        -> Either Error a -- ^Returns an element of the Tensor on succes.
+getIndex Sparse _ = undefined
+getIndex (Dense vals shape@(_:s)) indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices 
+                                    | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
+                          where multiDimensionIndexToOne (x:xs) (i:is) = foldr (*) (x * i) xs + multiDimensionIndexToOne xs is
+                                multiDimensionIndexToOne [] [] = 0
+                                -- No further pattern matching required due to correctIndex already checking for the length.
+
+correctIndex :: [Int] -> [Int] -> Bool
+correctIndex [] [] = True -- If both are empty the indices are correct
+correctIndex (x:xs) (y:ys) = x <= y && correctIndex xs ys -- Neither are emtpy, therefore must be evaluated
+correctIndex _ _ = False -- One is empty, one is not, length is not the same, therefore not correct
