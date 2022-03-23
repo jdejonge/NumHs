@@ -31,8 +31,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5,
-      split
+      base >=4.7 && <5
+    , split
   default-language: Haskell2010
 
 executable numhs-exe
@@ -45,6 +45,7 @@ executable numhs-exe
   build-depends:
       base >=4.7 && <5
     , numhs
+    , split
   default-language: Haskell2010
 
 test-suite numhs-test
@@ -58,4 +59,5 @@ test-suite numhs-test
   build-depends:
       base >=4.7 && <5
     , numhs
+    , split
   default-language: Haskell2010

@@ -19,7 +19,7 @@ import qualified Data.List.Split as LS
 import GHC.Base (undefined)
 
 -- |Tensor error, returned by functions that might fail depending on the shape of its argument(s).
-data Error = Error String deriving(Show)
+newtype Error = Error String deriving(Show)
 
 data Interval = Interval Int Int
 
@@ -47,7 +47,7 @@ shape (Dense _ s) = s
 shape Sparse = undefined
 
 instance (Show a) => Show (Tensor a) where
-    show (Dense xs [_]) = show xs
+    show (Dense xs []) = show xs
     show (Dense xs (s:shape)) = "[" ++ L.intercalate ", " (map (\x -> show $ let (Right vec) = fromList x shape in vec) (LS.chunksOf (length xs  `div` s) xs)) ++ "]"
     show Sparse = undefined
 
@@ -57,12 +57,13 @@ reshape :: Tensor a  -- ^`Tensor` to be reshaped.
         -> Either Error (Tensor a) -- ^Returns the `Tensor` with the new shape on succes.
 reshape (Dense d shape) newshape    | product shape == product newshape = Right $ Dense d newshape
                                     | otherwise = Left $ Error $ "Cannot reshape Tensor of shape " ++ show shape ++ " to new shape " ++ show newshape ++ "."
+reshape Sparse newshape = undefined
 
 
 -- |Creates a vector from a given list.
 vector :: [a] -- ^The list containing the elements of the vector.
         -> Tensor a -- ^Returns a 1D `Tensor`.
-vector xs = Dense xs $ [length xs]
+vector xs = Dense xs [length xs]
 
 -- |Creates a `Tensor` of the given shape from a list of elements.
 fromList :: [a] -- ^A flat list containing the elements of the tensor.
@@ -80,15 +81,16 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 --
 -- >>> [5, 9, 6, 7] |@| [2]
 -- 6
-(|@|) :: Tensor a 
+(|@|) :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 
 -- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
+(Dense xs []) |@| index = undefined
 (Dense xs s@(_:shape)) |@| index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
-                            in case idx < length xs of 
-                                True -> Right $ xs !! idx
-                                False -> Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
+                            in  if idx < length xs
+                                then Right $ xs !! idx
+                                else Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
 Sparse |@| _ = undefined
 
 -- |Slicing allows for taking a contiguous subsection of a `Tensor`.
@@ -118,11 +120,11 @@ Sparse |@| _ = undefined
 (|#|) :: Tensor a -- ^The tensor to take the subtensor of.
         -> [Interval] -- ^List of intervals for each dimension to be included in the new tensor.
         -> Either Error (Tensor a) -- ^Returns a new `Tensor` of the same dimensionality on succes.
-(Dense d shape) |#| intervals   | validInterval shape intervals = let 
+(Dense d shape) |#| intervals   | validInterval shape intervals = let
                                         mods = shape
-                                        divs = (tail shape) ++ [1]
-                                        flatToNested = map (\(m, d) -> \x -> x `div` d `mod` m) (zip mods divs)
-                                        flatIdx = [0..(length d)-1]
+                                        divs = tail shape ++ [1]
+                                        flatToNested = zipWith (curry (\ (m, d) x -> x `div` d `mod` m)) mods divs
+                                        flatIdx = [0..length d-1]
                                         nested = map (\i -> map ($i) flatToNested) flatIdx -- [[dim0, dim1, dim2], [dim0, dim1, dim2]]
                                         nestedData = zip nested d
                                         filtered = filter (\(n, x) -> all (\(idx, inter) -> inInterval inter idx) (zip n intervals)) nestedData
@@ -134,18 +136,21 @@ Sparse |#| _ = undefined
 
 -- Helper function, checks whether a given Interval is valid for a shape.
 validInterval :: [Int] -> [Interval] -> Bool
-validInterval shape interval  | length shape == length interval = all id [u <= x|(x, Interval _ u) <- zip shape interval]
+validInterval shape interval  | length shape == length interval = and [u <= x|(x, Interval _ u) <- zip shape interval]
                         | otherwise = False
 
 -- |Indexing Tensors. Retrieves a single element at the specified index.
-getIndex :: Tensor a 
+getIndex :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 getIndex Sparse _ = undefined
-getIndex (Dense vals shape@(_:s)) indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices 
+getIndex (Dense vals []) indices = undefined
+getIndex (Dense vals shape@(_:s)) indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
                                     | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
                           where multiDimensionIndexToOne (x:xs) (i:is) = foldr (*) (x * i) xs + multiDimensionIndexToOne xs is
                                 multiDimensionIndexToOne [] [] = 0
+                                multiDimensionIndexToOne xs [] = undefined
+                                multiDimensionIndexToOne [] xs = undefined
                                 -- No further pattern matching required due to correctIndex already checking for the length.
 
 correctIndex :: [Int] -> [Int] -> Bool
