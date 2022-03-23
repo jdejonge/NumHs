@@ -1,17 +1,22 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use foldr" #-}
 {-|
 Module      : Core
 Description : This module describes the core data types and functions of NumHS.
 -}
 module Core(
     Error(..),
-    Tensor(),
+    Tensor(Dense, Sparse),
     vector,
     fromList,
     shape,
     reshape,
     (|@|),
     (|:|),
-    (|#|)
+    (|#|),
+    listToListN
 ) where
 
 import qualified Data.List as L
@@ -26,6 +31,33 @@ data Interval = Interval Int Int
 instance Show Interval where
     show (Interval lower upper) = show lower ++ ":" ++ show upper
 
+data Zero
+data Succ n
+data SNat n where
+    SZero :: SNat Zero
+    SSucc :: SNat n -> SNat (Succ n)
+
+-- | A list of type a and of length n
+data ListN a n where
+    Nil  :: ListN a Zero
+    Cons :: a -> ListN a n -> ListN a (Succ n)
+
+instance (Show a) => Show (ListN a n) where
+    show Nil = "Nil"
+    show (Cons x xs@Nil) = "Cons " ++ show x ++ " " ++ show xs
+    show (Cons x xs) = "Cons " ++ show x  ++ " (" ++ show xs ++ ")"
+
+data ListAnyN a where
+    ListAnyN :: SNat n -> ListN a n -> ListAnyN a
+
+instance (Show a) => Show (ListAnyN a) where
+    show (ListAnyN sn ln) = "ListAnyN (" ++ show ln ++ ")"
+
+listToListN :: [a] -> ListAnyN a
+listToListN []      = ListAnyN SZero Nil
+listToListN (x:xs)  =
+    case listToListN xs of
+        ListAnyN sn ln -> ListAnyN (SSucc sn) (Cons x ln)
 
 -- |Function to create a Interval. Fails if incorrect values are provided.
 (|:|) :: Int        -- ^Inclusive lower bound of Interval. Needs to be @0 <= lower bound@
@@ -81,10 +113,15 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 --
 -- >>> [5, 9, 6, 7] |@| [2]
 -- 6
+
+-- | toIndex :: size -> indices -> current dimension level -> index
+toIndex :: ListN Int (Succ n) -> ListN Int (Succ n) -> Int -> Int
+toIndex (Cons x Nil) (Cons y Nil) d = d * y
+toIndex (Cons x xs@(Cons _ _)) (Cons y ys@(Cons _ _)) d = d * y + toIndex xs ys (d * x)
+
 (|@|) :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
-
 -- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
 (Dense xs []) |@| index = undefined
 (Dense xs s@(_:shape)) |@| index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
