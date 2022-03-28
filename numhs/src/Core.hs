@@ -1,11 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use foldr" #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-|
 Module      : Core
@@ -39,20 +38,26 @@ instance Show Interval where
     show (Between lower upper) = show lower ++ ":" ++ show upper
     show (Or left right) = "(" ++ show left ++ ") | (" ++ show right ++ ")"
 
-data Nat = Zero | Succ Nat deriving Show
-data SNat n where
-    SZero :: SNat Zero
-    SSucc :: SNat (Succ n)
+data Nat where
+    Zero :: Nat
+    Succ :: Nat -> Nat
+    deriving Show
+
+instance Eq Nat where
+    Zero == Zero = True
+    Succ x == Zero = False
+    Succ x == Succ y = x == y
 
 -- | A list of type a and of length n
-data ListN n a where
+data ListN (dim :: Nat) a where
     Nil  :: ListN Zero a
-    Cons :: ListN n a -> a -> ListN (Succ n) a
+    Cons :: a -> ListN n a -> ListN (Succ n) a
+infixr 5 `Cons`
 
 instance (Show a) => Show (ListN n a) where
     show Nil = "Nil"
     show (Cons xs@Nil x) = "Cons " ++ show xs ++ " " ++ show x
-    show (Cons xs x) = "Cons (" ++ show xs  ++ ") " ++ show x
+    show (Cons xs x) = "Cons " ++ show x  ++ " (" ++ show x ++ ")"
 
 instance Foldable (ListN a) where
     foldr f b Nil = b
@@ -74,11 +79,25 @@ inInterval :: Interval -> Nat -> Bool
 inInterval (Between lower upper) n = lower <= n && n < upper
 inInterval (Or left right) n = inInterval left n || inInterval right n
 
+type family Plus m n where
+  Plus (Succ m) n = Plus m (Succ n)
+  Plus Zero n = n
+
+type family Times m n where
+  Times (Succ m) n = Plus n (Times m n)
+  Times Zero n = Zero
+
+type family Product (dims) where
+  Product '[] = Succ Zero
+  Product (m : ns) = Times m (Product ns)
 
 -- |Main Tensor datatype.
-data Tensor m n a where
-    Dense :: ListN m a -> ListN n Int -> Tensor m n a
-    Sparse :: Tensor m n a
+data Tensor (dims :: [Nat]) a where
+    Dense :: (Product dims ~ n) => ListN n a -> Tensor dims a
+    Sparse :: Tensor n a
+
+t1 :: Tensor '[Succ Zero, Succ (Succ Zero), Succ (Succ (Succ Zero))] Int
+t1 = Dense (1 `Cons` 2 `Cons` 3 `Cons` 4 `Cons` 5 `Cons` 6 `Cons` Nil)
 
 getCompleteDimension :: ListN n Int-> Int
 getCompleteDimension Nil = 0
@@ -91,12 +110,12 @@ intToNat x  | x > 0 = Succ (intToNat $ x - 1)
 
 
 -- |Returns the shape of the `Tensor`.
-shape :: Tensor m n a-- ^The `Tensor` we want to know the shape of.
-        -> ListN n Int -- ^Returns the shape of the argument Tensor.
+shape :: Tensor n a-- ^The `Tensor` we want to know the shape of.
+        -> dims -- ^Returns the shape of the argument Tensor.
 shape (Dense _ s) = s
 shape Sparse = undefined
 
-instance (Show a) => Show (Tensor m n a) where
+instance (Show a) => Show (Tensor n a) where
     show (Dense xs ls) = "Dense (" ++ show xs ++ ")  (" ++ show ls ++ ")"
     --show (Dense xs (s:shape)) = "[" ++ L.intercalate ", " (map (\x -> show $ let (Right vec) = fromList x shape in vec) (LS.chunksOf (length xs  `div` s) xs)) ++ "]"
     show Sparse = undefined
@@ -106,10 +125,14 @@ Nil !! _ = error "There is no element left to get."
 (Cons xs x) !! Zero = x
 (Cons xs x) !! (Succ n) = xs Core.!! n
 
+ls :: ListN n a -> ListN n a -> a
+ls = undefined
+
 -- |Reshaping Tensors.
-reshape :: Tensor m n a -- ^`Tensor` to be reshaped.
-        -> ListN o Int -- ^The new shape. Its product should equal the product of the old shape.
-        -> Either Error (Tensor m o a) -- ^Returns the `Tensor` with the new shape on succes.
+reshape :: (Product lm ~ l, Product (ns :: [Nat]) ~ n, l ~ n )=>
+        Tensor ns a -- ^`Tensor` to be reshaped. 
+        -> ls -- ^The new shape. Its product should equal the product of the old shape.
+        -> Either Error (Tensor lm a) -- ^Returns the `Tensor` with the new shape on succes.
 reshape (Dense d shape) newshape    | product shape == product newshape = Right $ Dense d newshape
                                     | otherwise = Left $ Error $ "Cannot reshape Tensor of shape " ++ show shape ++ " to new shape " ++ show newshape ++ "."
 reshape Sparse newshape = undefined
@@ -124,8 +147,9 @@ natToInt (Succ x) = 1 + natToInt x
 
 
 -- |Creates a vector from a given list.
-vector :: ListN m a -- ^The list containing the elements of the vector.
-        -> Tensor m (Succ Zero) a-- ^Returns a 1D `Tensor`.
+vector :: (Product l ~ m, length l ~ 1) =>
+        ListN m a -- ^The list containing the elements of the vector.
+        -> Tensor l a-- ^Returns a 1D `Tensor`.
 vector Nil = Dense Nil (Cons Nil 0)
 vector (Cons xs x) = Dense (Cons xs x) (Cons Nil (natToInt $ lengthListN $ Cons xs x))
 
@@ -198,10 +222,10 @@ Sparse |@| _ = undefined
 -- [[1, 2, 3], [4, 5, 6]]
 -- 
 
-helperFilter :: ListN n a -> ListN n Interval -> SNat m -> ListN m a
-helperFilter Nil _ = Nil
+-- helperFilter :: ListN n a -> ListN n Interval -> SNat m -> ListN m a
+-- helperFilter Nil _ = Nil
 
-(|#|) :: Tensor m n a -> ListN n Interval -> Either Error (Tensor p q a)
+(|#|) :: Tensor n a -> ListN n Interval -> Either Error (Tensor q a)
 (|#|) = undefined
 
 
