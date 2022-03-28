@@ -17,4 +17,5 @@ main = do
 
     let (Right vec''') = vec' |#| [0|:|1, 0|:|3]
     putStrLn $ "Another example with the same matrix: " ++ show vec' ++ " |#| [0|:|1, 0|:|3] results in the first row vector " ++ show vec'''
+    putStrLn $ show $ idTensor 2 2
     
