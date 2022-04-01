@@ -62,6 +62,7 @@ listToListN (x:xs)  =
     case listToListN xs of
         ListAnyN sn ln -> ListAnyN (SSucc sn) (Cons x ln)
 
+infixl 4 |:|
 -- |Function to create a Interval. Fails if incorrect values are provided.
 (|:|) :: Int        -- ^Inclusive lower bound of Interval. Needs to be @0 <= lower bound@
         -> Int      -- ^Exclusive upper bound of Interval. Needs to be @lower bound< upper bound@
@@ -89,6 +90,7 @@ values Sparse = undefined
 
 instance (Show a) => Show (Tensor a) where
     show (Dense xs []) = show xs
+    show (Dense xs (s:[])) = show xs
     show (Dense xs (s:shape)) = "[" ++ L.intercalate ", " (map (\x -> show $ let (Right vec) = fromList x shape in vec) (LS.chunksOf (length xs  `div` s) xs)) ++ "]"
     show Sparse = undefined
 
