@@ -18,7 +18,8 @@ module Core(
     (|:|),
     (|#|),
     listToListN,
-    idTensor
+    idTensor,
+    Interval(..)
 ) where
 
 import qualified Data.List as L

@@ -25,7 +25,7 @@ source-repository head
 
 library
   exposed-modules:
-      Core
+      Core, Reduce
   other-modules:
       Paths_numhs
   hs-source-dirs:
