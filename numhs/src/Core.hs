@@ -19,7 +19,7 @@ module Core(
     (|#|),
     listToListN,
     idTensor,
-    Interval(..)
+    Interval
 ) where
 
 import qualified Data.List as L
@@ -76,6 +76,9 @@ inInterval (Interval lower upper) n = lower <= n && n < upper
 -- |Main Tensor datatype.
 data Tensor a = Dense [a] [Int] | Sparse
 
+instance Functor Tensor where
+    fmap f (Dense d s) = Dense (fmap f d) s
+
 -- |Returns the shape of the `Tensor`.
 shape :: Tensor a -- ^The `Tensor` we want to know the shape of.
         -> [Int] -- ^Returns the shape of the argument Tensor.
@@ -124,11 +127,6 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 --
 -- >>> [5, 9, 6, 7] |@| [2]
 -- 6
-
--- | toIndex :: size -> indices -> current dimension level -> index
-toIndex :: ListN Int (Succ n) -> ListN Int (Succ n) -> Int -> Int
-toIndex (Cons x Nil) (Cons y Nil) d = d * y
-toIndex (Cons x xs@(Cons _ _)) (Cons y ys@(Cons _ _)) d = d * y + toIndex xs ys (d * x)
 
 (|@|) :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
@@ -186,6 +184,12 @@ Sparse |#| _ = undefined
 validInterval :: [Int] -> [Interval] -> Bool
 validInterval shape interval  | length shape == length interval = and [u <= x|(x, Interval _ u) <- zip shape interval]
                         | otherwise = False
+
+
+-- | toIndex :: size -> indices -> current dimension level -> index
+toIndex :: ListN Int (Succ n) -> ListN Int (Succ n) -> Int -> Int
+toIndex (Cons x Nil) (Cons y Nil) d = d * y
+toIndex (Cons x xs@(Cons _ _)) (Cons y ys@(Cons _ _)) d = d * y + toIndex xs ys (d * x)
 
 -- |Indexing Tensors. Retrieves a single element at the specified index.
 getIndex :: Tensor a
