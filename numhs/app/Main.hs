@@ -1,7 +1,8 @@
 module Main where
 
 import Core
-
+import CreateTensor
+import LinAlg
 
 main :: IO ()
 main = do
