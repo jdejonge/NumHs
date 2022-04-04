@@ -206,3 +206,13 @@ correctIndex _ _ = False -- One is empty, one is not, length is not the same, th
 mapTensor :: (a -> b) -> Tensor a -> Tensor b
 mapTensor f (Dense v s) = (Dense (map f v) s)
 mapTensor _ Sparse = undefined
+
+zipWithTensor :: (a -> b -> c) -> Tensor a -> Tensor b -> Tensor c
+zipWithTensor f (Dense v1 s1) (Dense v2 s2) = (Dense (zipWith f v1 v2) s)
+zipWithTensor _ Sparse = undefined
+
+extractScalar :: (Num a) -> Tensor a -> Either Error (a)
+extractScalar (Dense [v] shape@[s]) | s == 1 = Right $ v
+                              | otherwise = Left $ Error $ "The shape " ++ show shape ++ " of the tensor is not a 1-D shape."
+extractScalar (Dense _ shape) = Left $ Error $ "The shape " ++ show shape ++ " of the tensor is not a 1-D shape."
+extractScalar Sparse = undefined
