@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/setup-config
 numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/build/Core.hi
 numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/build/Core.o
@@ -39,3 +40,4 @@ numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/build/CreateTe
 numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/build/CreateTensor.o
 numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/build/LinAlg.hi
 numhs/dist-newstyle/build/x86_64-windows/ghc-8.10.2/numhs-0.1.0.0/build/LinAlg.o
+dist-newstyle
