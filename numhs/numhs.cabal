@@ -27,6 +27,8 @@ library
   exposed-modules:
       Core
       GADTTensor
+      Core, CreateTensor, LinAlg, Math
+
   other-modules:
       Paths_numhs
   hs-source-dirs:

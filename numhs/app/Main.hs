@@ -1,7 +1,8 @@
 module Main where
 
 import Core
-
+import CreateTensor
+import LinAlg
 
 main :: IO ()
 main = print "Hello"
@@ -15,6 +16,3 @@ main = print "Hello"
     -- let (Right vec'') = vec' |#| [0|:|2, 1|:|3]
     -- putStrLn $ "3x3 matrix " ++ show vec' ++ " sliced with [0|:|2, 1|:|3] results in 2x2 matrix " ++ show vec'' ++ " with shape " ++ show (shape vec'')
 
-    -- let (Right vec''') = vec' |#| [0|:|1, 0|:|3]
-    -- putStrLn $ "Another example with the same matrix: " ++ show vec' ++ " |#| [0|:|1, 0|:|3] results in the first row vector " ++ show vec'''
-    
