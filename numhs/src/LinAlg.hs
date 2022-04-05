@@ -18,14 +18,20 @@ addTensor (Dense v1 s1) (Dense v2 s2) | s1 == s2 = Right $ Dense (zipWith (+) v1
                                       | otherwise = Left $ Error $ "Dimensions " ++ show s1 ++ " are not equal to dimensions " ++ show s2 ++ "."
 addTensor _ _ = undefined
 
-dot :: (Num a) => Tensor a -> Tensor a -> Tensor a
-dot t1@(Dense v1 [s1]) t2@(Dense v2 [s2]) | s1 == s2 = Dense (zipWith (*) v1 v2) [s1] --0-D 0-D
-                                          | otherwise = inner t1 t2 --1-D 1-D
-dot t1@(Dense v1 (s11:s12)) t2@(Dense v2 (s21:s22)) = matmul t1 t2 --2-D 2-D
-dot t1@(Dense v1 s1) t2@(Dense v2 [s2]) = undefined -- Sum over last axis of a and b
-dot t1@(Dense v1 s1) t2@(Dense v2 s2) = undefined -- Sum over last axis of a and second-to-last axis of b
+dot :: (Num a) => Tensor a -> Tensor a -> Either Error (Tensor a)
+dot t1@(Dense v1 [s1]) t2@(Dense v2 [s2]) = Right $ Dense (zipWith (*) v1 v2) [smallest]
+    where smallest = min s1 s2
+dot t1@(Dense v1 (s11:s12)) t2@(Dense v2 (s21:s22)) = Right $ matmul t1 t2 --2-D 2-D
+dot t1@(Dense v1 _) t2@(Dense v2 _) = Left $ Error "Higher dimensional than 2 cannot be possible."
 dot _ _ = undefined
 
+getRow2D :: (Num a) => Int -> Tensor a -> [a]
+getRow2D r (Dense xs [d1, d2]) = fst (foldr (\x (xs, y) -> if y `mod` d2 == r then (x:xs, y + 1) else (xs, y + 1)) ([], 0) xs)
+getRow2D _ _ = error "Only defined for 2 dimensional matrices."
+
+getColumn2D :: (Num a) => Int -> Tensor a -> [a]
+getColumn2D c (Dense x [d1, d2]) = take d2 (drop (c * d2) x)
+getColumn2D _ _ = error "Only defined for 2 dimensional matrices."
 
 inner :: (Num a) => Tensor a -> Tensor a -> Tensor a
 inner = undefined
