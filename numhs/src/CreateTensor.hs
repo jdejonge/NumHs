@@ -20,6 +20,6 @@ idTensor size dimension = Dense (idTensorVals (gap size size (dimension' - 1)) s
     
 idTensorVals :: Int -> Int -> [Int]
 idTensorVals gap 1 = [1]
-idTensorVals gap size = [1] ++ addGap gap (idTensorVals gap (size - 1))
+idTensorVals gap size = 1 : addGap gap (idTensorVals gap (size - 1))
     where addGap 0 xs = xs
-          addGap i xs = [0] ++ addGap (i - 1) xs
+          addGap i xs = 0 : addGap (i - 1) xs
