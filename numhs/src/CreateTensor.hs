@@ -13,9 +13,8 @@ module CreateTensor(
 import Core
 
 idTensor :: Int -> Int -> Tensor Int
-idTensor size dimension = Dense (idTensorVals (gap size size (dimension' - 1)) size) (replicate dimension' size)
-    where dimension' = dimension - 1
-          gap val len 0 = val
+idTensor size dimension = Dense (idTensorVals (gap size size (dimension - 2)) size) (replicate dimension size)
+    where gap val len 0 = val
           gap val len i = gap ((val + 1) * len) len (i - 1)
     
 idTensorVals :: Int -> Int -> [Int]
