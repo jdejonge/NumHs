@@ -53,10 +53,22 @@ instance (Show a) => Show (ListNG n a) where
     show (ConsG x xs@NilG) = "ConsG " ++ show x ++ " " ++ show xs
     show (ConsG x xs) = "ConsG " ++ show x  ++ " (" ++ show xs ++ ")"
 
-instance Foldable (ListNG a) where
+instance Functor (ListNG n) where
+    fmap f NilG = NilG
+    fmap f (ConsG x xs) = ConsG (f x) (fmap f xs)
+
+instance Foldable (ListNG n) where
     foldr f b NilG = b
     foldr f b (ConsG x xs) = f x (foldr f b xs)
 
+
+apply :: ListNG n (a -> b) -> ListNG n a -> ListNG n b
+apply NilG NilG = NilG
+apply (ConsG f fs) (ConsG x xs) = ConsG (f x) (apply fs xs)
+
+-- getIndex :: (Less m n ~ True) => ListNG n a -> m -> a
+-- getIndex (ConsG x xs) ZeroG = x
+-- getIndex (ConsG x xs) (SuccG n) = getIndex xs n
 
 type family Plus m n where
     Plus (SuccG m) n = Plus m (SuccG n)
@@ -73,6 +85,10 @@ type family Product (dims) where
 type family Length dims where
     Length '[] = ZeroG
     Length (m : ms) = SuccG (Length ms)
+
+type family Less n1 n2 where
+    Less ZeroG (SuccG n) = True
+    Less (SuccG n) (SuccG m) = Less n m
 
 data SameProduct (dims1 :: [NatG]) (dims2 :: [NatG]) where
     Same :: (Product dims1 ~ d1, Product dims2 ~ d2, d1 ~ d2) => SameProduct dims1 dims2
@@ -126,3 +142,28 @@ fromListG :: (Product l1 ~ n) =>
         -> TensorG l1 a -- ^Returns a `Tensor` of the given shape holding the data on success.
 fromListG = DenseG
 
+addG :: (Num a, l1 ~ l2) =>
+    TensorG l1 a
+    -> TensorG l2 a
+    -> TensorG l2 a
+addG (DenseG ls1) (DenseG ls2) = DenseG (apply (fmap (+) ls1) ls2)
+addG _ _ = undefined
+
+multiplyPointWise :: (Num a, l1 ~ l2) =>
+    TensorG l1 a
+    -> TensorG l2 a
+    -> TensorG l2 a
+multiplyPointWise (DenseG ls1) (DenseG ls2) = DenseG (apply (fmap (*) ls1) ls2)
+multiplyPointWise _ _ = undefined
+
+t1 :: TensorG '[SuccG ZeroG, SuccG (SuccG ZeroG), SuccG (SuccG (SuccG ZeroG))] Int
+t1 = DenseG (1 `ConsG` 2 `ConsG` 3 `ConsG` 4 `ConsG` 5 `ConsG` 6 `ConsG` NilG)
+
+t2 :: TensorG '[SuccG ZeroG, SuccG (SuccG ZeroG), SuccG (SuccG (SuccG ZeroG))] Int
+t2 = DenseG (10 `ConsG` 20 `ConsG` 30 `ConsG` 40 `ConsG` 50 `ConsG` 60 `ConsG` NilG)
+
+t3 :: TensorG '[SuccG (SuccG ZeroG), SuccG ZeroG, SuccG (SuccG (SuccG ZeroG))] Int
+t3 = DenseG (10 `ConsG` 20 `ConsG` 30 `ConsG` 40 `ConsG` 50 `ConsG` 60 `ConsG` NilG)
+
+-- getElementBy1DIndex :: (Product ) => TensorG n a -> m -> a
+-- getElementBy1DIndex (DenseG ls) = get
