@@ -48,9 +48,9 @@ inner = undefined
 matmul :: (Num a) => Tensor a -> Tensor a -> Either Error (Tensor a)
 matmul t1@(Dense v1 s1@[s11, s12]) t2@(Dense v2 s2@[s21, s22]) | s11 == s22 = Right $ Dense (loopOverCol (s11 - 1) (s11 - 1)) [s11, s11]
                                                          | otherwise = Left $ error $ "shapes " ++ show s1 ++ " and " ++ show s2 ++ " are not compatible."
-    where loopOverRow row col | row == 0 = []
+    where loopOverRow row col | row < 0 = []
                               | otherwise = tensorDotIndex t1 t2 row col : loopOverRow (row - 1) col
-          loopOverCol maxRow col | col == 0 = []
+          loopOverCol maxRow col | col < 0 = []
                                  | otherwise = loopOverRow maxRow col ++ loopOverCol maxRow (col - 1)
 matmul _ _ = error "Only defined for 2 dimensionl matrices"
 
