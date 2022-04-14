@@ -127,16 +127,16 @@ toIndex :: ListN Int (Succ n) -> ListN Int (Succ n) -> Int -> Int
 toIndex (Cons x Nil) (Cons y Nil) d = d * y
 toIndex (Cons x xs@(Cons _ _)) (Cons y ys@(Cons _ _)) d = d * y + toIndex xs ys (d * x)
 
-(|@|) :: Tensor a
+getIndex :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 -- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
-(Dense xs []) |@| index = undefined
-(Dense xs s@(_:shape)) |@| index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
+getIndex (Dense xs []) index = undefined
+getIndex (Dense xs s@(_:shape)) index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
                             in  if idx < length xs
                                 then Right $ xs !! idx
                                 else Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-Sparse |@| _ = undefined
+getIndex Sparse _ = undefined
 
 -- |Slicing allows for taking a contiguous subsection of a `Tensor`.
 --
@@ -185,12 +185,12 @@ validInterval shape interval  | length shape == length interval = and [u <= x|(x
                         | otherwise = False
 
 -- |Indexing Tensors. Retrieves a single element at the specified index.
-getIndex :: Tensor a
+(|@|) :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
-getIndex Sparse _ = undefined
-getIndex (Dense vals []) indices = undefined
-getIndex (Dense vals shape@(_:s)) indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
+Sparse |@| _ = undefined
+(Dense vals []) |@| indices = undefined
+(Dense vals shape@(_:s)) |@| indices | correctIndex indices shape = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
                                     | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
                           where multiDimensionIndexToOne (x:xs) (i:is) = foldr (*) (x * i) xs + multiDimensionIndexToOne xs is
                                 multiDimensionIndexToOne [] [] = 0

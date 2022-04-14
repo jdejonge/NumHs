@@ -28,6 +28,23 @@ dot t1@(Dense v1 [s1]) t2@(Dense v2 [s2]) = Right $ Dense (zipWith (*) v1 v2) [s
 dot t1@(Dense v1 _) t2@(Dense v2 _) = Left $ Error "Higher dimensional than 2 cannot be possible."
 dot _ _ = undefined
 
+replaceElement :: [a] -> a -> Int -> [a]
+replaceElement xs new i = x ++ new : ys
+    where (x,_:ys) = splitAt i xs
+
+addDummyElement :: [a] -> a -> Int -> [a]
+addDummyElement xs dummy i = x ++ dummy : y
+    where (x,y) = splitAt i xs
+
+-- |Gets a dimension vector given a dimension and coordinates on that dimension.
+getDim :: Tensor a -- ^`Tensor` for which the dimension should be found.
+        -> Int -- ^Dimension to be gotten.
+        -> [Int] -- ^Location of dimension to be gotten, should be a value for every element in shape except for the dimension.
+        -> Either Error [a] --Dimension
+getDim t@(Dense v s) x c = Right $ map (index shapeList x t) (increasingList (s !! x))
+    where index ls i t x = let (Right y) = t |@| replaceElement ls x i in y
+          shapeList = addDummyElement c 0 x
+
 getRow2D :: (Num a) => Int -> Tensor a -> [a]
 getRow2D r (Dense xs [d1, d2]) = fst (foldr (\x (xs, y) -> if y `mod` d2 == r then (x:xs, y + 1) else (xs, y + 1)) ([], 0) xs)
 getRow2D _ _ = error "Only defined for 2 dimensional matrices."
