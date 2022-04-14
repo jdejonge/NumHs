@@ -187,7 +187,7 @@ validInterval shape interval    | length shape == length interval = and [u <= x|
                                             Just n -> Right $ xs !! n
                                             Nothing -> Right def
                                     | otherwise = Left $ Error $ "Tensor index " ++ show indices ++ " is out of bounds for Tensor of shape " ++ show shape
-(Dense vals shape) |@| indices  | correctIndex indices shape    = Right $ vals !! coordinatesToIndex indices shape 
+(Dense vals shape) |@| indices  | correctIndex indices shape    = Right $ vals !! coordinatesToIndex indices shape
                                 | otherwise                     = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
                                 -- No further pattern matching required due to correctIndex already checking for the length.
 
@@ -200,16 +200,17 @@ toOtherRepresentation :: (Default a, Eq a) => Tensor a -> Tensor a
 toOtherRepresentation (Dense xs shape) =
     let (new_xs, new_cs) = foldr (\(x,i) (new_xs, new_ys) -> if x == def then (new_xs, new_ys) else (x : new_xs, indexToCoordinates i shape : new_ys)) ([], []) (zip xs [0..(product shape - 1)])
     in Sparse new_xs new_cs shape
-toOtherRepresentation (Sparse xs cs shape) = 
-    let (_, new_xs) = foldr (
-            \(x, i)  (currentplace, ys)-> 
-                if i == indexToCoordinates currentplace shape 
-                    then (currentplace + 1, x : ys) 
-                    else (coordinatesToIndex i shape + 1, replicate (coordinatesToIndex i shape - currentplace) def ++ [x] ++ ys)
-            ) (0, []) (zip xs cs)
+toOtherRepresentation (Sparse xs cs shape) =
+    let summedDistance n [] = []
+        summedDistance n [x] = [x - n]
+        summedDistance n (x:xs) = x - n : summedDistance (x + 1) xs
+        new_xs = foldr (
+            \(x, i, p)  ys ->
+                replicate p def ++ [x] ++ ys
+            ) (replicate (product shape - 1 - coordinatesToIndex (last cs) shape) def) (zip3 xs cs (summedDistance 0 (map (`coordinatesToIndex` shape) cs)))
     in Dense new_xs shape
 
-coordinatesToIndex :: [Int] -> [Int] -> Int 
+coordinatesToIndex :: [Int] -> [Int] -> Int
 coordinatesToIndex [] _ = 0
 coordinatesToIndex _ [] = 0
 coordinatesToIndex (x:xs) (y:ys) = x * product ys + coordinatesToIndex xs ys
