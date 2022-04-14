@@ -15,13 +15,14 @@ module Core(
     shape,
     values,
     reshape,
-    getIndex,
+    (|@|),
     (|:|),
     (|#|),
     indexToCoordinates,
     valuesHelper,
     validInterval,
-    coordinatesToIndex
+    coordinatesToIndex,
+    toOtherRepresentation
 ) where
 
 import qualified Data.List as L
@@ -80,10 +81,10 @@ instance (Show a) => Show (Tensor a) where
     show (Dense xs []) = show xs
     show (Dense xs (s:shape)) = "[" ++ L.intercalate ", " (map (\x -> show $ let (Right vec) = fromList x shape in vec) (LS.chunksOf (length xs  `div` s) xs)) ++ "]"
     show (Sparse [] [] s) = "Empty Sparse Tensor \nsize: " ++ show s
-    show (Sparse (x:xs) [] s) = drop 1 (foldr (\x y -> y ++ " \n" ++ show x) "" (x:xs)) ++ "\nsize: " ++ show s
-    show (Sparse [] (y:ys) s) = drop 1 (foldr (\x y -> y ++ " \n" ++ show x) "" (y:ys)) ++ "\nsize: " ++ show s
-    show (Sparse (x:xs) (y:ys) s) = drop 1 (foldr (\(x, y) r -> r ++ "\n" ++ show x ++ " : " ++ show y) "" (zip (x:xs) (y:ys))) ++
-            "\nsize: " ++ show s
+    show (Sparse (x:xs) [] s) = foldr (\x y -> show x ++ "\n" ++ y) "" (x:xs) ++ "size: " ++ show s
+    show (Sparse [] (y:ys) s) = foldr (\x y -> show x ++ "\n" ++ y) "" (y:ys) ++ "size: " ++ show s
+    show (Sparse (x:xs) (y:ys) s) = foldr (\(x, y) r -> show x ++ " : " ++ show y ++ "\n" ++ r) "" (zip (x:xs) (y:ys)) ++
+            "size: " ++ show s
 
 instance Functor Tensor where
     fmap f (Dense x s) = Dense (map f x) s
@@ -122,20 +123,6 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 -- 6
 
 -- | toIndex :: size -> indices -> current dimension level -> index
-
-getIndex :: Default a => Tensor a
-        -> [Int] -- ^List of indices, one integer for each dimension.
-        -> Either Error a -- ^Returns an element of the Tensor on succes.
--- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
-getIndex (Dense xs []) index = undefined
-getIndex (Dense xs s@(_:shape)) index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
-                            in  if idx < length xs
-                                then Right $ xs !! idx
-                                else Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-getIndex (Sparse xs cs s) index | product index >= product s = Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-                                | otherwise =   case elemIndex index cs of
-                                                    Just n -> Right $ xs !! n
-                                                    Nothing -> Right def
 
 -- |Slicing allows for taking a contiguous subsection of a `Tensor`.
 --
@@ -192,22 +179,21 @@ validInterval shape interval    | length shape == length interval = and [u <= x|
                                 | otherwise = False
 
 -- |Indexing Tensors. Retrieves a single element at the specified index.
-(|@|) :: Tensor a
+(|@|) :: Default a => Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
-(Sparse xs cs s) |@| _ = undefined
-(Dense vals []) |@| indices = undefined
-(Dense vals shape@(_:s)) |@| indices | correctIndex indices shape = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
-                                    | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
-                          where multiDimensionIndexToOne (x:xs) (i:is) = foldr (*) (x * i) xs + multiDimensionIndexToOne xs is
-                                multiDimensionIndexToOne [] [] = 0
-                                multiDimensionIndexToOne xs [] = undefined
-                                multiDimensionIndexToOne [] xs = undefined
+(Sparse xs cs shape) |@| indices    | correctIndex indices shape =
+                                        case elemIndex indices cs of
+                                            Just n -> Right $ xs !! n
+                                            Nothing -> Right def
+                                    | otherwise = Left $ Error $ "Tensor index " ++ show indices ++ " is out of bounds for Tensor of shape " ++ show shape
+(Dense vals shape) |@| indices  | correctIndex indices shape    = Right $ vals !! coordinatesToIndex indices shape 
+                                | otherwise                     = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
                                 -- No further pattern matching required due to correctIndex already checking for the length.
 
 correctIndex :: [Int] -> [Int] -> Bool
 correctIndex [] [] = True -- If both are empty the indices are correct
-correctIndex (x:xs) (y:ys) = x <= y && correctIndex xs ys -- Neither are emtpy, therefore must be evaluated
+correctIndex (x:xs) (y:ys) = x < y && correctIndex xs ys -- Neither are emtpy, therefore must be evaluated
 correctIndex _ _ = False -- One is empty, one is not, length is not the same, therefore not correct
 
 toOtherRepresentation :: (Default a, Eq a) => Tensor a -> Tensor a
@@ -216,8 +202,8 @@ toOtherRepresentation (Dense xs shape) =
     in Sparse new_xs new_cs shape
 toOtherRepresentation (Sparse xs cs shape) = 
     let (_, new_xs) = foldr (
-            \(x, i) (currentplace, ys) -> 
-                if i == indexToCoordinates (currentplace + 1) shape 
+            \(x, i)  (currentplace, ys)-> 
+                if i == indexToCoordinates currentplace shape 
                     then (currentplace + 1, x : ys) 
                     else (coordinatesToIndex i shape + 1, replicate (coordinatesToIndex i shape - currentplace) def ++ [x] ++ ys)
             ) (0, []) (zip xs cs)
