@@ -124,7 +124,7 @@ reshape (Dense d s) s' = Dense d (natVals s')
 
 (|@|) :: (ValidIndex n m, NatVals m) => Tensor a n -> Index m -> a
 (Dense xs []) |@| _ = undefined
-(Dense xs s@(_:shape)) |@| index' = let index = natVals index'
+(Dense xs (_:shape)) |@| index' = let   index = natVals index'
                                         idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
                             in xs !! idx
 
@@ -147,3 +147,11 @@ reshape (Dense d s) s' = Dense d (natVals s')
 
                                     new_shape = map (\[lower, upper] -> upper - lower) (filter (\e -> length e > 0) intervals)
                                 in Dense new_data new_shape
+
+assignAt :: (ValidIndex n m, NatVals m) => Tensor a n -> Index m -> a -> Tensor a n
+assignAt (Dense xs []) _ _ = undefined
+assignAt (Dense xs s@(_:shape)) index' value = let  index = natVals index'
+                                                    idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
+                                                    (x,_:ys) = L.splitAt idx xs
+                                                    xs' = x ++ (value : ys) in
+                                                        Dense xs' s
