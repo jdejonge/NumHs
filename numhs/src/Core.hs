@@ -9,22 +9,26 @@ Description : This module describes the core data types and functions of NumHS.
 module Core(
     Error(..),
     Tensor(Dense, Sparse),
+    Interval(Interval),
     vector,
     fromList,
     shape,
     values,
     reshape,
-    (|@|),
+    getIndex,
     (|:|),
     (|#|),
     indexToCoordinates,
-    valuesHelper
+    valuesHelper,
+    validInterval,
+    coordinatesToIndex
 ) where
 
 import qualified Data.List as L
 import qualified Data.List.Split as LS
 import GHC.Base (undefined)
 import Data.Default
+import Data.List
 
 -- |Tensor error, returned by functions that might fail depending on the shape of its argument(s).
 newtype Error = Error String deriving(Show)
@@ -75,14 +79,11 @@ valuesHelper (x:xs) (c:cs) s y  | coor == c = x : valuesHelper xs cs s (y + 1)
 instance (Show a) => Show (Tensor a) where
     show (Dense xs []) = show xs
     show (Dense xs (s:shape)) = "[" ++ L.intercalate ", " (map (\x -> show $ let (Right vec) = fromList x shape in vec) (LS.chunksOf (length xs  `div` s) xs)) ++ "]"
-    show (Sparse [] [] s) = ""
-    show (Sparse (x:xs) [] s) = drop 1 $ foldr (\x y -> y ++ " \n" ++ show x) "" (x:xs)
-    show (Sparse [] (y:ys) s) = drop 1 $ foldr (\x y -> y ++ " \n" ++ show x) "" (y:ys)
-    show (Sparse (x:xs) (y:ys) s) = drop 1 $ foldr (\(x, y) r -> r ++ "\n" ++ show x ++ " : " ++ show y) "" (combine (x:xs) (y:ys))
-        where   combine [] [] = []
-                combine (x:xs) [] = []
-                combine [] (y:ys) = []
-                combine (x:xs) (y:ys) = (x,y) : combine xs ys
+    show (Sparse [] [] s) = "Empty Sparse Tensor \nsize: " ++ show s
+    show (Sparse (x:xs) [] s) = drop 1 (foldr (\x y -> y ++ " \n" ++ show x) "" (x:xs)) ++ "\nsize: " ++ show s
+    show (Sparse [] (y:ys) s) = drop 1 (foldr (\x y -> y ++ " \n" ++ show x) "" (y:ys)) ++ "\nsize: " ++ show s
+    show (Sparse (x:xs) (y:ys) s) = drop 1 (foldr (\(x, y) r -> r ++ "\n" ++ show x ++ " : " ++ show y) "" (zip (x:xs) (y:ys))) ++
+            "\nsize: " ++ show s
 
 instance Functor Tensor where
     fmap f (Dense x s) = Dense (map f x) s
@@ -122,7 +123,7 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 
 -- | toIndex :: size -> indices -> current dimension level -> index
 
-getIndex :: Tensor a
+getIndex :: Default a => Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 -- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
@@ -131,7 +132,10 @@ getIndex (Dense xs s@(_:shape)) index = let idx = sum [a * b |(a, b) <- zip (sha
                             in  if idx < length xs
                                 then Right $ xs !! idx
                                 else Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-getIndex (Sparse xs cs s) _ = undefined
+getIndex (Sparse xs cs s) index | product index >= product s = Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
+                                | otherwise =   case elemIndex index cs of
+                                                    Just n -> Right $ xs !! n
+                                                    Nothing -> Right def
 
 -- |Slicing allows for taking a contiguous subsection of a `Tensor`.
 --
@@ -172,12 +176,20 @@ getIndex (Sparse xs cs s) _ = undefined
                                         new_shape = map (\(Interval lower upper) -> upper - lower) intervals
                                     in Right $ Dense new_data new_shape
                                 | otherwise = Left $ Error $ "Intervals " ++ show intervals ++ " are not valid for a Tensor of shape " ++ show shape ++ "."
-(Sparse xs cs s) |#| _ = undefined
+(Sparse xs cs s) |#| intervals  | validInterval s intervals =
+                                    let new_shape = map (\(Interval lower upper) -> upper - lower) intervals
+                                        insideIntervals [] [] = True
+                                        insideIntervals x [] = False
+                                        insideIntervals [] x = False
+                                        insideIntervals (x:xs) (y:ys) = inInterval y x && insideIntervals xs ys
+                                        (new_xs, new_cs) = foldr (\(x, y) (new_xs, new_ys) -> if insideIntervals y intervals then (x : new_xs, y : new_ys) else (new_xs, new_ys)) ([], []) (zip xs cs)
+                                    in Right $ Sparse new_xs new_cs new_shape
+                                | otherwise = Left $ Error $ "Intervals " ++ show intervals ++ " are not valid for a Tensor of shape " ++ show s ++ "."
 
 -- Helper function, checks whether a given Interval is valid for a shape.
 validInterval :: [Int] -> [Interval] -> Bool
-validInterval shape interval  | length shape == length interval = and [u <= x|(x, Interval _ u) <- zip shape interval]
-                        | otherwise = False
+validInterval shape interval    | length shape == length interval = and [u <= x|(x, Interval _ u) <- zip shape interval]
+                                | otherwise = False
 
 -- |Indexing Tensors. Retrieves a single element at the specified index.
 (|@|) :: Tensor a
@@ -198,7 +210,20 @@ correctIndex [] [] = True -- If both are empty the indices are correct
 correctIndex (x:xs) (y:ys) = x <= y && correctIndex xs ys -- Neither are emtpy, therefore must be evaluated
 correctIndex _ _ = False -- One is empty, one is not, length is not the same, therefore not correct
 
--- zipWithTensor :: (a -> b -> c) -> Tensor a -> Tensor b -> Tensor c
--- zipWithTensor f (Dense v1 s1) (Dense v2 s2) = Dense (zipWith f v1 v2) s
--- zipWithTensor f Sparse _ = undefined
--- zipWithTensor f _ Sparse = undefined 
+toOtherRepresentation :: (Default a, Eq a) => Tensor a -> Tensor a
+toOtherRepresentation (Dense xs shape) =
+    let (new_xs, new_cs) = foldr (\(x,i) (new_xs, new_ys) -> if x == def then (new_xs, new_ys) else (x : new_xs, indexToCoordinates i shape : new_ys)) ([], []) (zip xs [0..(product shape - 1)])
+    in Sparse new_xs new_cs shape
+toOtherRepresentation (Sparse xs cs shape) = 
+    let (_, new_xs) = foldr (
+            \(x, i) (currentplace, ys) -> 
+                if i == indexToCoordinates (currentplace + 1) shape 
+                    then (currentplace + 1, x : ys) 
+                    else (coordinatesToIndex i shape + 1, replicate (coordinatesToIndex i shape - currentplace) def ++ [x] ++ ys)
+            ) (0, []) (zip xs cs)
+    in Dense new_xs shape
+
+coordinatesToIndex :: [Int] -> [Int] -> Int 
+coordinatesToIndex [] _ = 0
+coordinatesToIndex _ [] = 0
+coordinatesToIndex (x:xs) (y:ys) = x * product ys + coordinatesToIndex xs ys

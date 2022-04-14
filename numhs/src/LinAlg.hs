@@ -44,14 +44,18 @@ getDim :: Tensor a -- ^`Tensor` for which the dimension should be found.
         -> Int -- ^Dimension to be gotten.
         -> [Int] -- ^Location of dimension to be gotten, should be a value for every element in shape except for the dimension.
         -> Either Error [a] --Dimension
-getDim t@(Dense v s) x c | length maybeList == length noMaybeList = Right noMaybeList
-                         | otherwise = Left $ Error "Incorrect indices."
-    where noMaybeList = catMaybes maybeList
-          maybeList = map (index shapeList x t) (increasingList (s !! x))
-          shapeList = addDummyElement c 0 x
-          index ls i t x | isRight y = let (Right ys) = y in Just ys
-                         | otherwise = Nothing
-                        where y = t |@| replaceElement ls x i
+getDim t@(Dense v s) x c = undefined --Right $ map (index shapeList x t) (increasingList (s !! x))
+    -- where index ls i t x = let (Right y) = t |@| replaceElement ls x i in y
+    --       shapeList = addDummyElement c 0 x
+getDim _ _ _ = undefined
+-- getDim t@(Dense v s) x c | length maybeList == length noMaybeList = Right noMaybeList
+--                          | otherwise = Left $ Error "Incorrect indices."
+--     where noMaybeList = catMaybes maybeList
+--           maybeList = map (index shapeList x t) (increasingList (s !! x))
+--           shapeList = addDummyElement c 0 x
+--           index ls i t x | isRight y = let (Right ys) = y in Just ys
+--                          | otherwise = Nothing
+--                         where y = t |@| replaceElement ls x i
                         
 
 getRow2D :: (Num a) => Tensor a  -> Int -> Either Error [a]
