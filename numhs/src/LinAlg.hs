@@ -54,3 +54,6 @@ matmul t1@(Dense v1 s1@[s11, s12]) t2@(Dense v2 s2@[s21, s22]) | s11 == s22 = Ri
                                  | otherwise = loopOverRow maxRow col ++ loopOverCol maxRow (col - 1)
 matmul _ _ = error "Only defined for 2 dimensionl matrices"
 
+concat :: Tensor a -> Tensor a -> Int -> Tensor a
+concat (Dense x xs) (Dense xy ys) a = undefined 
+concat _ _ _ = undefined

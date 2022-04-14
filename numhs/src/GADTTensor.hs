@@ -20,7 +20,6 @@ For using in GHCI you have to use:
 
 module GADTTensor where
 
-
 data NatG where
     ZeroG :: NatG
     SuccG :: NatG -> NatG
@@ -36,7 +35,6 @@ instance Ord NatG where
     ZeroG <= _ = True 
     SuccG x <= ZeroG = False
     SuccG x <= SuccG y = x <= y
-
 
 -- | A list of type a and of length n
 data ListNG (dim :: NatG) a where

@@ -17,13 +17,14 @@ module Core(
     (|@|),
     (|:|),
     (|#|),
-    listToListN,
-    mapTensor
+    indexToCoordinates,
+    valuesHelper
 ) where
 
 import qualified Data.List as L
 import qualified Data.List.Split as LS
 import GHC.Base (undefined)
+import Data.Default
 
 -- |Tensor error, returned by functions that might fail depending on the shape of its argument(s).
 newtype Error = Error String deriving(Show)
@@ -32,34 +33,6 @@ data Interval = Interval Int Int
 
 instance Show Interval where
     show (Interval lower upper) = show lower ++ ":" ++ show upper
-
-data Zero
-data Succ n
-data SNat n where
-    SZero :: SNat Zero
-    SSucc :: SNat n -> SNat (Succ n)
-
--- | A list of type a and of length n
-data ListN a n where
-    Nil  :: ListN a Zero
-    Cons :: a -> ListN a n -> ListN a (Succ n)
-
-instance (Show a) => Show (ListN a n) where
-    show Nil = "Nil"
-    show (Cons x xs@Nil) = "Cons " ++ show x ++ " " ++ show xs
-    show (Cons x xs) = "Cons " ++ show x  ++ " (" ++ show xs ++ ")"
-
-data ListAnyN a where
-    ListAnyN :: SNat n -> ListN a n -> ListAnyN a
-
-instance (Show a) => Show (ListAnyN a) where
-    show (ListAnyN sn ln) = "ListAnyN (" ++ show ln ++ ")"
-
-listToListN :: [a] -> ListAnyN a
-listToListN []      = ListAnyN SZero Nil
-listToListN (x:xs)  =
-    case listToListN xs of
-        ListAnyN sn ln -> ListAnyN (SSucc sn) (Cons x ln)
 
 -- |Function to create a Interval. Fails if incorrect values are provided.
 (|:|) :: Int        -- ^Inclusive lower bound of Interval. Needs to be @0 <= lower bound@
@@ -72,24 +45,48 @@ inInterval :: Interval -> Int -> Bool
 inInterval (Interval lower upper) n = lower <= n && n < upper
 
 -- |Main Tensor datatype.
-data Tensor a = Dense [a] [Int] | Sparse
+data Tensor a = Dense [a] [Int] | Sparse [a] [[Int]] [Int]
 
 -- |Returns the shape of the `Tensor`.
 shape :: Tensor a -- ^The `Tensor` we want to know the shape of.
         -> [Int] -- ^Returns the shape of the argument Tensor.
 shape (Dense _ s) = s
-shape Sparse = undefined
+shape (Sparse _ _ s) = s
 
 -- |Returns the values of the `Tensor`.
-values :: Tensor a  -- ^The `Tensor` we want to know the values of.
+values :: Default a => Tensor a  -- ^The `Tensor` we want to know the values of.
         -> [a] -- ^Returns the values of the argument Tensor.
 values (Dense v _) = v
-values Sparse = undefined
+values (Sparse v c s) = valuesHelper v c s 0
+
+indexToCoordinates :: Int -> [Int] -> [Int]
+indexToCoordinates _ [] = []
+indexToCoordinates x [y] = [x `mod` y]
+indexToCoordinates x (y:ys) = ((x `div` product ys) `mod` y) : indexToCoordinates x ys
+
+valuesHelper :: Default a => [a] -> [[Int]] -> [Int] -> Int -> [a]
+valuesHelper [] d s x = replicate (product s - x) def
+valuesHelper x [] s y = replicate (product s - y) def
+valuesHelper (x:xs) (c:cs) s y  | coor == c = x : valuesHelper xs cs s (y + 1)
+                                | otherwise = def : valuesHelper (x:xs) (c:cs) s (y + 1)
+    where coor = indexToCoordinates y s
+
 
 instance (Show a) => Show (Tensor a) where
     show (Dense xs []) = show xs
     show (Dense xs (s:shape)) = "[" ++ L.intercalate ", " (map (\x -> show $ let (Right vec) = fromList x shape in vec) (LS.chunksOf (length xs  `div` s) xs)) ++ "]"
-    show Sparse = undefined
+    show (Sparse [] [] s) = ""
+    show (Sparse (x:xs) [] s) = drop 1 $ foldr (\x y -> y ++ " \n" ++ show x) "" (x:xs)
+    show (Sparse [] (y:ys) s) = drop 1 $ foldr (\x y -> y ++ " \n" ++ show x) "" (y:ys)
+    show (Sparse (x:xs) (y:ys) s) = drop 1 $ foldr (\(x, y) r -> r ++ "\n" ++ show x ++ " : " ++ show y) "" (combine (x:xs) (y:ys))
+        where   combine [] [] = []
+                combine (x:xs) [] = []
+                combine [] (y:ys) = []
+                combine (x:xs) (y:ys) = (x,y) : combine xs ys
+
+instance Functor Tensor where
+    fmap f (Dense x s) = Dense (map f x) s
+    fmap f (Sparse xs cs s) = Sparse (map f xs) cs s
 
 -- |Reshaping Tensors.
 reshape :: Tensor a  -- ^`Tensor` to be reshaped.
@@ -97,7 +94,8 @@ reshape :: Tensor a  -- ^`Tensor` to be reshaped.
         -> Either Error (Tensor a) -- ^Returns the `Tensor` with the new shape on succes.
 reshape (Dense d shape) newshape    | product shape == product newshape = Right $ Dense d newshape
                                     | otherwise = Left $ Error $ "Cannot reshape Tensor of shape " ++ show shape ++ " to new shape " ++ show newshape ++ "."
-reshape Sparse newshape = undefined
+reshape (Sparse xs cs shape) newshape   | product shape == product newshape = Right $ Sparse xs cs newshape
+                                        | otherwise = Left $ Error $ "Cannot reshape Tensor of shape " ++ show shape ++ " to new shape " ++ show newshape ++ "."
 
 
 -- |Creates a vector from a given list.
@@ -123,9 +121,6 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 -- 6
 
 -- | toIndex :: size -> indices -> current dimension level -> index
-toIndex :: ListN Int (Succ n) -> ListN Int (Succ n) -> Int -> Int
-toIndex (Cons x Nil) (Cons y Nil) d = d * y
-toIndex (Cons x xs@(Cons _ _)) (Cons y ys@(Cons _ _)) d = d * y + toIndex xs ys (d * x)
 
 (|@|) :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
@@ -136,7 +131,7 @@ toIndex (Cons x xs@(Cons _ _)) (Cons y ys@(Cons _ _)) d = d * y + toIndex xs ys 
                             in  if idx < length xs
                                 then Right $ xs !! idx
                                 else Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-Sparse |@| _ = undefined
+(Sparse xs cs s) |@| _ = undefined
 
 -- |Slicing allows for taking a contiguous subsection of a `Tensor`.
 --
@@ -177,7 +172,7 @@ Sparse |@| _ = undefined
                                         new_shape = map (\(Interval lower upper) -> upper - lower) intervals
                                     in Right $ Dense new_data new_shape
                                 | otherwise = Left $ Error $ "Intervals " ++ show intervals ++ " are not valid for a Tensor of shape " ++ show shape ++ "."
-Sparse |#| _ = undefined
+(Sparse xs cs s) |#| _ = undefined
 
 -- Helper function, checks whether a given Interval is valid for a shape.
 validInterval :: [Int] -> [Interval] -> Bool
@@ -188,7 +183,7 @@ validInterval shape interval  | length shape == length interval = and [u <= x|(x
 getIndex :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
-getIndex Sparse _ = undefined
+getIndex (Sparse xs cs s) _ = undefined
 getIndex (Dense vals []) indices = undefined
 getIndex (Dense vals shape@(_:s)) indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
                                     | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
@@ -202,10 +197,6 @@ correctIndex :: [Int] -> [Int] -> Bool
 correctIndex [] [] = True -- If both are empty the indices are correct
 correctIndex (x:xs) (y:ys) = x <= y && correctIndex xs ys -- Neither are emtpy, therefore must be evaluated
 correctIndex _ _ = False -- One is empty, one is not, length is not the same, therefore not correct
-
-mapTensor :: (a -> b) -> Tensor a -> Tensor b
-mapTensor f (Dense v s) = Dense (map f v) s
-mapTensor _ Sparse = undefined
 
 -- zipWithTensor :: (a -> b -> c) -> Tensor a -> Tensor b -> Tensor c
 -- zipWithTensor f (Dense v1 s1) (Dense v2 s2) = Dense (zipWith f v1 v2) s
