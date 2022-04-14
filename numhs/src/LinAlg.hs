@@ -58,19 +58,21 @@ getDim _ _ _ = undefined
 --                         where y = t |@| replaceElement ls x i
                         
 
-getRow2D :: (Num a) => Int -> Tensor a -> [a]
-getRow2D r (Dense xs [d1, d2]) = fst (foldr (\x (xs, y) -> if y `mod` d2 == r then (x:xs, y + 1) else (xs, y + 1)) ([], 0) xs)
-getRow2D _ _ = error "Only defined for 2 dimensional matrices."
+getRow2D :: (Num a) => Tensor a  -> Int -> Either Error [a]
+getRow2D t@(Dense xs [d1, d2]) r = getDim t 0 [r]
+getRow2D _ _ = Left $ Error "Only defined for 2 dimensional matrices. Use getDim instead."
 
-getColumn2D :: (Num a) => Int -> Tensor a -> [a]
-getColumn2D c (Dense x [d1, d2]) = take d2 (drop (c * d2) x)
-getColumn2D _ _ = error "Only defined for 2 dimensional matrices."
+getColumn2D :: (Num a) => Tensor a -> Int -> Either Error [a]
+getColumn2D t@(Dense x [d1, d2]) c = getDim t 1 [c]
+getColumn2D _ _ = Left $ Error "Only defined for 2 dimensional matrices. Use getDim instead."
 
 dotVector :: (Num a) => [a] -> [a] -> a
 dotVector x y = sum $ zipWith (*) x y
 
 tensorDotIndex :: (Num a) => Tensor a -> Tensor a -> Int -> Int -> a
-tensorDotIndex t1 t2 row col = dotVector (getRow2D row t1) (getColumn2D col t2)
+tensorDotIndex t1 t2 row col = dotVector rowVec colVec
+  where (Right rowVec) = getRow2D t1 row
+        (Right colVec) = getColumn2D t2 col
 
 inner :: (Num a) => Tensor a -> Tensor a -> Tensor a
 inner = undefined

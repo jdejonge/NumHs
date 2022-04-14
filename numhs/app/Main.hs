@@ -16,16 +16,19 @@ main = do
     --putStrLn $ "ID tensor: " ++ show idtensor ++ "."
 
 
-    --let (Right vec1) = fromList [1, 2, 3, 4, 5, 6] [2, 3]
-    --let (Right vec2) = fromList [7, 8, 9, 10, 11, 12] [3, 2]
+    let (Right vec1) = fromList [1, 2, 3, 4, 5, 6] [2, 3]
+    let (Right vec2) = fromList [7, 8, 9, 10, 11, 12] [3, 2]
 
+    --let (Right vec3) = fromList [1, 7, 3, 9, 5, 11, 2, 8, 4, 10, 6, 12] [2, 3, 2]
+    print vec1
+    --print (getRow2D vec1 0)
     -- let (Right vec3) = fromList [1, 7, 3, 9, 5, 11, 2, 8, 4, 10, 6, 12] [2, 3, 2]
     -- print vec3
     -- print $ getIndex vec3 [1, 1, 1]
     -- --print (test vec3 0 [1, 1])
     -- print (getDim vec3 0 [1, 1])
     --let (Right result) = matmul vec1 vec2
-    --putStrLn $ show $ values result
+    --print $ values result
 
     -- -- Slicing
     -- let (Right vec') = fromList [1..9] [3, 3]
