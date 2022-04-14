@@ -16,6 +16,8 @@ module LinAlg(
 
 import Core
 import Math
+import Data.Maybe
+import Data.Either
 
 addTensor :: (Num a) => Tensor a -> Tensor a -> Either Error (Tensor a)
 addTensor (Dense v1 s1) (Dense v2 s2) | s1 == s2 = Right $ Dense (zipWith (+) v1 v2) s1
@@ -46,6 +48,15 @@ getDim t@(Dense v s) x c = undefined --Right $ map (index shapeList x t) (increa
     -- where index ls i t x = let (Right y) = t |@| replaceElement ls x i in y
     --       shapeList = addDummyElement c 0 x
 getDim _ _ _ = undefined
+-- getDim t@(Dense v s) x c | length maybeList == length noMaybeList = Right noMaybeList
+--                          | otherwise = Left $ Error "Incorrect indices."
+--     where noMaybeList = catMaybes maybeList
+--           maybeList = map (index shapeList x t) (increasingList (s !! x))
+--           shapeList = addDummyElement c 0 x
+--           index ls i t x | isRight y = let (Right ys) = y in Just ys
+--                          | otherwise = Nothing
+--                         where y = t |@| replaceElement ls x i
+                        
 
 getRow2D :: (Num a) => Int -> Tensor a -> [a]
 getRow2D r (Dense xs [d1, d2]) = fst (foldr (\x (xs, y) -> if y `mod` d2 == r then (x:xs, y + 1) else (xs, y + 1)) ([], 0) xs)
