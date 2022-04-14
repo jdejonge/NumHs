@@ -15,7 +15,7 @@ module Core(
     shape,
     values,
     reshape,
-    (|@|),
+    getIndex,
     (|:|),
     (|#|),
     indexToCoordinates,
@@ -123,19 +123,19 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
 
 -- | toIndex :: size -> indices -> current dimension level -> index
 
-(|@|) :: Default a => Tensor a
+getIndex :: Default a => Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 -- This assumes that there is no `Tensor` with shape [], which should be enforced by the functions used to create tensors.
-(Dense xs []) |@| index = undefined
-(Dense xs s@(_:shape)) |@| index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
+getIndex (Dense xs []) index = undefined
+getIndex (Dense xs s@(_:shape)) index = let idx = sum [a * b |(a, b) <- zip (shape ++ [1]) index]
                             in  if idx < length xs
                                 then Right $ xs !! idx
                                 else Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-(Sparse xs cs s) |@| index  | product index >= product s = Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
-                            | otherwise =   case elemIndex index cs of
-                                                Just n -> Right $ xs !! n
-                                                Nothing -> Right def
+getIndex (Sparse xs cs s) index | product index >= product s = Left $ Error $ "Tensor index " ++ show index ++ " is out of bounds for Tensor of shape " ++ show s
+                                | otherwise =   case elemIndex index cs of
+                                                    Just n -> Right $ xs !! n
+                                                    Nothing -> Right def
 
 -- |Slicing allows for taking a contiguous subsection of a `Tensor`.
 --
@@ -192,12 +192,12 @@ validInterval shape interval    | length shape == length interval = and [u <= x|
                                 | otherwise = False
 
 -- |Indexing Tensors. Retrieves a single element at the specified index.
-getIndex :: Tensor a
+(|@|) :: Tensor a
         -> [Int] -- ^List of indices, one integer for each dimension.
         -> Either Error a -- ^Returns an element of the Tensor on succes.
-getIndex (Sparse xs cs s) _ = undefined
-getIndex (Dense vals []) indices = undefined
-getIndex (Dense vals shape@(_:s)) indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
+(Sparse xs cs s) |@| _ = undefined
+(Dense vals []) |@| indices = undefined
+(Dense vals shape@(_:s)) |@| indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
                                     | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
                           where multiDimensionIndexToOne (x:xs) (i:is) = foldr (*) (x * i) xs + multiDimensionIndexToOne xs is
                                 multiDimensionIndexToOne [] [] = 0
