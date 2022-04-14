@@ -185,7 +185,7 @@ validInterval shape interval  | length shape == length interval = and [u <= x|(x
         -> Either Error a -- ^Returns an element of the Tensor on succes.
 (Sparse xs cs s) |@| _ = undefined
 (Dense vals []) |@| indices = undefined
-(Dense vals shape@(_:s)) |@| indices | correctIndex shape indices = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
+(Dense vals shape@(_:s)) |@| indices | correctIndex indices shape = Right $ vals !! multiDimensionIndexToOne (s ++ [1]) indices
                                     | otherwise = Left $ Error $ "Dimensions " ++ show indices ++ " do not fit into dimensions " ++ show shape ++ "."
                           where multiDimensionIndexToOne (x:xs) (i:is) = foldr (*) (x * i) xs + multiDimensionIndexToOne xs is
                                 multiDimensionIndexToOne [] [] = 0
