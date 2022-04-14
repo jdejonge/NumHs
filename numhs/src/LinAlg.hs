@@ -10,7 +10,8 @@ module LinAlg(
     addTensor,
     matmul,
     getRow2D,
-    getColumn2D
+    getColumn2D,
+    getDim
 ) where
 
 import Core

@@ -20,8 +20,7 @@ main = do
 
     let (Right vec3) = fromList [1, 7, 3, 9, 5, 11, 2, 8, 4, 10, 6, 12] [2, 3, 2]
     print vec3
-    print $ getIndex vec3 [1, 1, 1]
-    print (test vec3 0 [1, 1])
+    print $ vec3 |@| [1, 1, 1]
     print (getDim vec3 0 [1, 1])
     --let (Right result) = matmul vec1 vec2
     --putStrLn $ show $ values result
