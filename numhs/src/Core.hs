@@ -95,6 +95,7 @@ type ValidSlice sh sl = ValidSlice' sh sl ~ 'True
 
 type family SliceShape (sl :: [[Nat]]) :: [Nat] where
     SliceShape ('[ '[] ]) = '[0]
+    SliceShape ('[]) = '[]
     SliceShape ('[start, end] ': xs) = ((GHC.TypeLits.-) end start) ': (SliceShape xs)
 
 
