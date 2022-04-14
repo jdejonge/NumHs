@@ -36,6 +36,7 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , data-default
     , split
   default-language: Haskell2010
 
@@ -48,6 +49,7 @@ executable numhs-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , data-default
     , numhs
     , split
   default-language: Haskell2010
@@ -62,6 +64,7 @@ test-suite numhs-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , data-default
     , numhs
     , split
   default-language: Haskell2010
