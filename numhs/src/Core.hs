@@ -153,9 +153,9 @@ fromList as shape   | product shape == length as = Right $ Dense as shape
         -> Either Error (Tensor a) -- ^Returns a new `Tensor` of the same dimensionality on succes.
 (Dense d shape) |#| intervals   | validInterval shape intervals = let
                                         mods = shape
-                                        divs = tail shape ++ [1]
-                                        flatToNested = zipWith (curry (\ (m, d) x -> x `div` d `mod` m)) mods divs
-                                        flatIdx = [0..length d-1]
+                                        divs = foldr (\e a -> ((head a * e) : a)) [1] (tail shape)
+                                        flatToNested = map (\(m, d) -> \x -> x `div` d `mod` m) (zip mods divs)
+                                        flatIdx = [0..(length d)-1]
                                         nested = map (\i -> map ($i) flatToNested) flatIdx -- [[dim0, dim1, dim2], [dim0, dim1, dim2]]
                                         nestedData = zip nested d
                                         filtered = filter (\(n, x) -> all (\(idx, inter) -> inInterval inter idx) (zip n intervals)) nestedData
