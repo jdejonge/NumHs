@@ -44,20 +44,16 @@ getDim :: Tensor a -- ^`Tensor` for which the dimension should be found.
         -> Int -- ^Dimension to be gotten.
         -> [Int] -- ^Location of dimension to be gotten, should be a value for every element in shape except for the dimension.
         -> Either Error [a] --Dimension
-getDim t@(Dense v s) x c = undefined --Right $ map (index shapeList x t) (increasingList (s !! x))
-    -- where index ls i t x = let (Right y) = t |@| replaceElement ls x i in y
-    --       shapeList = addDummyElement c 0 x
+getDim t@(Dense v s) x c | length maybeList == length noMaybeList = Right noMaybeList
+                         | otherwise = Left $ Error "Incorrect indices."
+    where noMaybeList = catMaybes maybeList
+          maybeList = map (index shapeList x t) (increasingList (s !! x))
+          shapeList = addDummyElement c 0 x
+          index ls i t x1 | isRight y = let (Right ys) = y in Just ys
+                         | otherwise = Nothing
+                        where y = t |@| replaceElement ls x1 i
 getDim _ _ _ = undefined
--- getDim t@(Dense v s) x c | length maybeList == length noMaybeList = Right noMaybeList
---                          | otherwise = Left $ Error "Incorrect indices."
---     where noMaybeList = catMaybes maybeList
---           maybeList = map (index shapeList x t) (increasingList (s !! x))
---           shapeList = addDummyElement c 0 x
---           index ls i t x | isRight y = let (Right ys) = y in Just ys
---                          | otherwise = Nothing
---                         where y = t |@| replaceElement ls x i
                         
-
 getRow2D :: (Num a) => Tensor a  -> Int -> Either Error [a]
 getRow2D t@(Dense xs [d1, d2]) r = getDim t 0 [r]
 getRow2D _ _ = Left $ Error "Only defined for 2 dimensional matrices. Use getDim instead."
@@ -78,13 +74,13 @@ inner :: (Num a) => Tensor a -> Tensor a -> Tensor a
 inner = undefined
 
 matmul :: (Num a) => Tensor a -> Tensor a -> Either Error (Tensor a)
-matmul t1@(Dense v1 s1@[s11, s12]) t2@(Dense v2 s2@[s21, s22]) | s11 == s22 = Right $ Dense (loopOverCol (s11 - 1) (s11 - 1)) [s11, s11]
+matmul t1@(Dense v1 s1@[s11, s12]) t2@(Dense v2 s2@[s21, s22]) | s11 == s22 = Right $ Dense (loopOverCol s12 s21 0) [s12, s21]
                                                          | otherwise = Left $ error $ "shapes " ++ show s1 ++ " and " ++ show s2 ++ " are not compatible."
-    where loopOverRow row col | row < 0 = []
-                              | otherwise = tensorDotIndex t1 t2 row col : loopOverRow (row - 1) col
-          loopOverCol maxRow col | col < 0 = []
-                                 | otherwise = loopOverRow maxRow col ++ loopOverCol maxRow (col - 1)
-matmul _ _ = error "Only defined for 2 dimensionl matrices"
+    where loopOverRow maxRow curCol curRow | curRow == maxRow = []
+                                           | otherwise = tensorDotIndex t1 t2 curRow curCol : loopOverRow maxRow curCol (curRow + 1)
+          loopOverCol maxCol maxRow curCol | curCol == maxCol = []
+                                           | otherwise = loopOverRow maxRow curCol 0 ++ loopOverCol maxCol maxRow (curCol + 1)
+matmul _ _ = error "Only defined for 2 dimensional matrices"
 
 concat :: Tensor a -> Tensor a -> Int -> Tensor a
 concat (Dense x xs) (Dense xy ys) a = undefined 
