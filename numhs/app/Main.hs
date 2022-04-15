@@ -16,7 +16,7 @@ main = do
     --putStrLn $ "ID tensor: " ++ show idtensor ++ "."
 
 
-    let (Right vec1) = fromList [1, 2, 3, 4, 5, 6] [2, 3]
+    let (Right vec1) = fromList [1 :: Integer, 2, 3, 4, 5, 6] [2, 3]
     let (Right vec2) = fromList [7, 8, 9, 10, 11, 12] [3, 2]
 
     --let (Right vec3) = fromList [1, 7, 3, 9, 5, 11, 2, 8, 4, 10, 6, 12] [2, 3, 2]

@@ -30,6 +30,7 @@ library
       GADTTensor
       LinAlg
       Math
+      Reduce
   other-modules:
       Paths_numhs
   hs-source-dirs:
